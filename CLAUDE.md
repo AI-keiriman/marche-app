@@ -49,7 +49,29 @@
 
 ## 設計（Day4 以降に追記していく）
 
-- 仕様: `docs/spec/`
-- 画面一覧: `docs/design/screens.md`
-- データベース設計: `docs/design/database.md`
-- 用語: {{ 生産者、購入者、商品、カート、注文、注文明細 などの定義 }}
+- 仕様（参考解答）: `docs/spec/`。自分たちの設計は `docs/design/` を正とする
+- ユーザーストーリー: [docs/design/user_stories.md](docs/design/user_stories.md)
+- 画面一覧: [docs/design/screens.md](docs/design/screens.md)
+- データベース設計: [docs/design/database.md](docs/design/database.md)
+- 用語: 生産者（producer。商品を出品する）、購入者（customer）、管理者（admin）、商品（products）、カート（セッションに `{"商品ID": 数量}` で持つ。テーブルにしない）、注文（orders。支払い待ち `pending` → 支払い済み `paid` / 取り消し `cancelled`）、注文明細（order_items。注文時点の商品名と単価を持つ）
+
+### 画面と URL
+
+- URL は screens.md のとおりにする。`/producer/` は生産者、`/orders/` はログインユーザー、`/admin/` は管理者の画面
+- 値を変える操作（削除、公開の切り替え、注文の作成・取り消し）は全て POST。GET のリンクで値を変えない
+- 他人の商品・注文は 403。非公開の商品の詳細は、出品者と管理者以外には 404
+
+### データ
+
+- 出品者は `products.producer_id`、注文者は `orders.user_id`。どちらも users.id を指すので混同しない
+- `role` と `status` は文字列で保存し、Python 側は StrEnum（`Role`、`OrderStatus`）で比べる
+- 金額は円の整数。注文の合計はサーバーが DB の価格で計算し、明細に注文時点の商品名・単価・小計を保存する
+- 在庫の `stock` は「いまある数」。支払いの確定時に、`pending` → `paid` の条件付き更新が成功したときだけ減らす
+- いま買える数（`stock` − 35分以内の支払い待ちの数量）は、`marche/services/inventory.py` の `available_stock()` だけで計算する
+- 注文がある商品は削除させない。SQLite は restrict を確かめないので、ビューでも確かめる
+
+### 外部サービス
+
+- Stripe を呼ぶコードは `marche/services/payment.py` だけに書く（AI 機能を足すなら、Claude API は `marche/services/ai.py` だけ）。views は `current_app.extensions` 経由で呼ぶ
+- テストでは本物の API を呼ばず、`create_app({"PAYMENT_SERVICE": FakePayment()})` のように設定でフェイクに差し替える
+- （AI 機能を足した場合）AI の出力はそのまま保存・公開しない。下書きとしてフォームに入れ、人が確認して「保存」を押したときだけ保存する
