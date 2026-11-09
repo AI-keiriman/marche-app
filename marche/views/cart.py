@@ -36,10 +36,13 @@ def get_published_or_404(product_id: int) -> Product:
 @bp.route("/")
 def show():
     lines = []
-    for product_id, quantity in get_cart().items():
+    cart = get_cart()
+    for product_id, quantity in list(cart.items()):
         product = db.session.get(Product, product_id)
         if product is None or not product.is_published:
-            continue  # 非公開になった商品は表示しない（注文のときにも弾かれる）
+            # 画面に出ない商品が残ると、注文のたびに断られて原因が分からないので外す
+            cart.pop(product_id)
+            continue
         lines.append(
             {
                 "product": product,
@@ -50,6 +53,9 @@ def show():
                 ),
             }
         )
+    if len(cart) != len(get_cart()):
+        save_cart(cart)
+        flash("販売を終了した商品をカートから外しました")
     total = sum(line["subtotal"] for line in lines)
     return render_template("cart/show.html", lines=lines, total=total)
 
@@ -62,7 +68,10 @@ def add(product_id: int):
     new_quantity = cart.get(product.id, 0) + (quantity or 0)
     limit = min(MAX_QUANTITY, available_stock(product))
     if quantity is None or quantity < 1 or not 1 <= new_quantity <= limit:
-        flash(f"「{product.name}」は1〜{limit}個までカートに入れられます")
+        if limit == 0:
+            flash(f"「{product.name}」は売り切れです")
+        else:
+            flash(f"「{product.name}」は1〜{limit}個までカートに入れられます")
         return redirect(url_for("shop.show", product_id=product.id))
     cart[product.id] = new_quantity
     save_cart(cart)

@@ -75,7 +75,7 @@ class Product(db.Model):
     price: Mapped[int]
     stock: Mapped[int] = mapped_column(default=0)
     is_published: Mapped[bool] = mapped_column(default=False)
-    # 写真のファイル名（UUID + 拡張子）。写真のアップロードは後の章で作る
+    # 写真のファイル名（UUID + 拡張子）。写真なしは NULL
     image_filename: Mapped[str | None] = mapped_column(String(100))
     created_at: Mapped[datetime] = mapped_column(default=now_jst)
     updated_at: Mapped[datetime] = mapped_column(default=now_jst, onupdate=now_jst)
@@ -133,6 +133,7 @@ class Order(db.Model):
 class OrderItem(db.Model):
     __tablename__ = "order_items"
     __table_args__ = (
+        # 上限は services/inventory.py の MAX_QUANTITY と同じ。変えるときは両方を変える
         CheckConstraint("quantity BETWEEN 1 AND 10", name="ck_order_items_quantity"),
     )
 

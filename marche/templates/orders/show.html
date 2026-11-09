@@ -3,7 +3,7 @@
 {% block content %}
 <h1>注文番号 {{ order.id }}</h1>
 <p>状態: <strong>{{ order.status_label }}</strong></p>
-<p>注文日時: {{ order.created_at.strftime("%Y/%m/%d %H:%M") }}</p>
+<p>注文日時: {{ order.created_at|jp_datetime }}</p>
 <table>
   <thead>
     <tr><th>商品</th><th>単価</th><th>数量</th><th>小計</th></tr>

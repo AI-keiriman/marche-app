@@ -44,8 +44,15 @@ def init_app(app):
         click.echo(f"管理者 {email} を作りました")
 
     @app.cli.command("seed")
+    @click.confirmation_option(
+        prompt="全てのデータを消して初期データを入れます。よろしいですか"
+    )
     def seed():
         """開発用の初期データを入れる。既存のデータは全て消す（本番では実行しない）"""
+        if not (app.debug or app.testing):
+            raise click.ClickException(
+                "本番では実行できません（開発では .env に FLASK_DEBUG=1）"
+            )
         # 外部キーの向きに合わせて、参照している側から消す
         for model in (OrderItem, Order, Product, User):
             db.session.execute(db.delete(model))

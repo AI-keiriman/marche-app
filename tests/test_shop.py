@@ -70,10 +70,10 @@ def test_存在しない商品の詳細は404(client):
 
 def test_seedで5人と8商品が入る(app, producer):
     runner = app.test_cli_runner()
-    result = runner.invoke(args=["seed"])
+    result = runner.invoke(args=["seed", "--yes"])
     assert result.exit_code == 0
     # 2回実行しても増えない（既存のデータを消してから入れる）
-    runner.invoke(args=["seed"])
+    runner.invoke(args=["seed", "--yes"])
     assert len(db.session.scalars(db.select(User)).all()) == 5
     products = db.session.scalars(db.select(Product)).all()
     assert len(products) == 8

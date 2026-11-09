@@ -46,6 +46,12 @@ def create_app(config=None):
     def yen(value: int) -> str:
         return f"{value:,}円"
 
+    @app.template_filter("jp_datetime")
+    def jp_datetime(value) -> str:
+        """「11月14日(土) 10:00」の形にする"""
+        weekday = "月火水木金土日"[value.weekday()]
+        return f"{value.month}月{value.day}日({weekday}) {value:%H:%M}"
+
     @app.errorhandler(403)
     def forbidden(error):
         return render_template("errors/403.html"), 403

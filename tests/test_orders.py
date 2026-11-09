@@ -1,7 +1,9 @@
+from datetime import datetime
+
 import pytest
 
 from marche.extensions import db
-from marche.models import Order, OrderItem, OrderStatus
+from marche.models import JST, Order, OrderItem, OrderStatus
 from marche.services.inventory import MAX_QUANTITY, OrderError, create_order
 
 
@@ -211,3 +213,29 @@ def test_注文がある商品は削除できない(client, producer, customer, 
     )
     assert "注文があるので削除できません" in response.text
     assert db.session.get(type(product), product.id) is not None
+
+
+def test_非公開になった商品はカートから外れて残りは注文できる(
+    client, producer, customer, make_product, login
+):
+    hidden = make_product(producer, name="非公開にする商品")
+    kept = make_product(producer, name="残る商品", price=400)
+    login(customer)
+    client.post(f"/cart/add/{hidden.id}", data={"quantity": "1"})
+    client.post(f"/cart/add/{kept.id}", data={"quantity": "1"})
+    hidden.is_published = False
+    db.session.commit()
+
+    assert "販売を終了した商品をカートから外しました" in client.get("/cart/").text
+    client.post("/orders/")
+    [order] = all_orders()
+    assert order.total_amount == 400
+
+
+def test_注文詳細の日時は日本の形式(client, producer, customer, make_product, login):
+    product = make_product(producer)
+    order = create_order(customer, {product.id: 1})
+    order.created_at = datetime(2026, 11, 14, 10, 0, tzinfo=JST).replace(tzinfo=None)
+    db.session.commit()
+    login(customer)
+    assert "11月14日(土) 10:00" in client.get(f"/orders/{order.id}").text
