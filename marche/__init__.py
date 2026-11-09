@@ -4,6 +4,7 @@ import os
 from flask import Flask, render_template
 
 from marche.extensions import csrf, db, login_manager, migrate
+from marche.services import payment
 
 
 def create_app(config=None):
@@ -14,6 +15,10 @@ def create_app(config=None):
             "DATABASE_URL", "sqlite:///marche.sqlite"
         ),
         SESSION_COOKIE_SECURE=os.environ.get("SESSION_COOKIE_SECURE") == "1",
+        STRIPE_SECRET_KEY=os.environ.get("STRIPE_SECRET_KEY", ""),
+        STRIPE_WEBHOOK_SECRET=os.environ.get("STRIPE_WEBHOOK_SECRET", ""),
+        # テストではフェイクを渡す。None なら本物の services/payment.py を使う
+        PAYMENT_SERVICE=None,
         UPLOAD_FOLDER=os.path.join(app.root_path, "static", "uploads"),
         # 写真は5MB まで（フォームで確かめる）。それより大きく外れたリクエストは、読み込む前に 413 で止める
         MAX_CONTENT_LENGTH=6 * 1024 * 1024,
@@ -27,6 +32,8 @@ def create_app(config=None):
         )
 
     db.init_app(app)
+    # 外部 API はここで差し替えられるようにする（テストではフェイクを渡す）
+    app.extensions["payment"] = app.config["PAYMENT_SERVICE"] or payment
     migrate.init_app(app, db)
     csrf.init_app(app)
     login_manager.init_app(app)

@@ -130,8 +130,8 @@ def test_非公開の商品はカートに入れられない(client, producer, m
     assert response.status_code == 404
 
 
-def test_カートから注文すると金額はDBの価格で計算される(
-    client, producer, customer, make_product, login
+def test_カートから注文するとStripeへ移動する(
+    client, producer, customer, make_product, login, fake_payment
 ):
     product = make_product(producer, price=300)
     login(customer)
@@ -139,7 +139,12 @@ def test_カートから注文すると金額はDBの価格で計算される(
     # フォームに金額を混ぜて送っても無視される
     response = client.post("/orders/", data={"total_amount": "1", "unit_price": "1"})
     [order] = all_orders()
-    assert response.headers["Location"] == f"/orders/{order.id}"
+    assert response.status_code == 303
+    assert response.headers["Location"] == (
+        f"https://checkout.stripe.test/cs_test_fake_{order.id}"
+    )
+    assert order.stripe_checkout_session_id == f"cs_test_fake_{order.id}"
+    assert fake_payment.created == [order.id]
     assert order.total_amount == 600
     assert order.items[0].unit_price == 300
     # 注文したらカートは空になる

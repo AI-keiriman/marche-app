@@ -3,13 +3,54 @@ import pytest
 from marche import create_app
 from marche.extensions import db
 from marche.models import Product, Role, User
+from marche.services import payment
 
 # 本物の外部サービス（Stripe、拡張で足す Claude API）は、テストでは呼ばない。
-# 決済の章（と AI の拡張）で、ここにフェイク（偽物）のクラスを足し、create_app() の設定で差し替える。
+# フェイク（偽物）のクラスを create_app() の設定で差し替える。
+
+
+class FakePayment:
+    """本物の Stripe（services/payment.py）の代わり。同じ名前の関数を持ち、呼ばれた引数を記録する"""
+
+    def __init__(self):
+        self.created = []  # create_checkout_session が呼ばれた注文の ID
+        self.expired = []  # expire_session が呼ばれた session_id
+        self.sessions = {}  # session_id -> retrieve_session で返す dict（08 章）
+        self.error = None  # 例外を入れておくと、それを投げる
+
+    def create_checkout_session(self, order):
+        if self.error:
+            raise self.error
+        session_id = f"cs_test_fake_{order.id}"
+        self.created.append(order.id)
+        return session_id, f"https://checkout.stripe.test/{session_id}"
+
+    def retrieve_session(self, session_id):
+        return self.sessions[session_id]
+
+    def expire_session(self, session_id):
+        if self.error:
+            raise self.error
+        self.expired.append(session_id)
 
 
 @pytest.fixture
-def app(tmp_path):
+def fake_payment():
+    return FakePayment()
+
+
+@pytest.fixture(autouse=True)
+def no_real_stripe(monkeypatch):
+    """保険: テストの中で本物の Stripe のクライアントを作ろうとしたら、必ず失敗させる"""
+
+    def refuse():
+        raise AssertionError("テストで本物の Stripe を呼ぼうとしました")
+
+    monkeypatch.setattr(payment, "_client", refuse)
+
+
+@pytest.fixture
+def app(fake_payment, tmp_path):
     app = create_app(
         {
             "TESTING": True,
@@ -17,6 +58,8 @@ def app(tmp_path):
             "WTF_CSRF_ENABLED": False,
             # テストの写真が marche/static/uploads に溜まらないように、一時フォルダーに保存する
             "UPLOAD_FOLDER": str(tmp_path / "uploads"),
+            "STRIPE_SECRET_KEY": "sk_test_dummy",
+            "PAYMENT_SERVICE": fake_payment,
         }
     )
     with app.app_context():
