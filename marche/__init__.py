@@ -2,6 +2,7 @@ import logging
 import os
 
 from flask import Flask, render_template
+from werkzeug.middleware.proxy_fix import ProxyFix
 
 from marche.extensions import csrf, db, login_manager, migrate
 from marche.services import payment
@@ -9,6 +10,7 @@ from marche.services import payment
 
 def create_app(config=None):
     app = Flask(__name__, instance_relative_config=True)
+    app.wsgi_app = ProxyFix(app.wsgi_app, x_for=1, x_proto=1)
     app.config.from_mapping(
         SECRET_KEY=os.environ.get("SECRET_KEY") or "dev",
         SQLALCHEMY_DATABASE_URI=os.environ.get(
