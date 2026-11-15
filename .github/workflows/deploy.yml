@@ -16,7 +16,7 @@ concurrency:
 
 jobs:
   test:
-    runs-on: ubuntu-24.04-latest
+    runs-on: ubuntu-24.04
 
     steps:
       - name: Checkout code
@@ -41,7 +41,7 @@ jobs:
 
   deploy:
     needs: test
-    runs-on: ubuntu-24.04-latest
+    runs-on: ubuntu-24.04
 
     steps:
       - name: Deploy over SSH
